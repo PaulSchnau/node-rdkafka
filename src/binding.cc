@@ -12,7 +12,7 @@
 
 using NodeKafka::Producer;
 using NodeKafka::Consumer;
-using NodeKafka::Topic;
+using NodeKafka::Connection;
 
 using node::AtExit;
 using RdKafka::ErrorCode;
@@ -129,7 +129,7 @@ void Init(v8::Local<v8::Object> exports, v8::Local<v8::Object> module) {
   AtExit(RdKafkaCleanup);
   Consumer::Init(exports);
   Producer::Init(exports);
-  Topic::Init(exports);
+  Connection::Topic::Init(exports);
   ConstantsInit(exports);
 
   exports->Set(Nan::New("librdkafkaVersion").ToLocalChecked(),

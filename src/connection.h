@@ -62,6 +62,47 @@ class Connection : public Nan::ObjectWrap {
   virtual void ActivateDispatchers() = 0;
   virtual void DeactivateDispatchers() = 0;
 
+  class Topic : public Nan::ObjectWrap {
+   public:
+    Topic(std::string, RdKafka::Conf *, Connection *);
+
+    static void Init(v8::Local<v8::Object>);
+    static v8::Local<v8::Object> NewInstance(v8::Local<v8::Value> arg);
+
+    Baton toRdKafkaTopic();
+    bool HasHandle();
+    void deref();
+
+    std::string Get(std::string, std::string &);
+
+    static Nan::Persistent<v8::Function> constructor;
+
+    friend class Connection;
+   protected:
+    static void New(const Nan::FunctionCallbackInfo<v8::Value>& info);
+
+    static NAN_METHOD(NodeGetMetadata);
+
+    RdKafka::Topic * m_topic;
+    // TopicConfig * config_;
+
+    std::string errstr;
+    Baton Name();
+
+    Connection * m_handle;
+    RdKafka::Conf * m_config;
+
+   private:
+    ~Topic();
+
+    static NAN_METHOD(NodeGet);
+    static NAN_METHOD(NodeGetName);
+    static NAN_METHOD(NodePartitionAvailable);
+    static NAN_METHOD(NodeOffsetStore);
+  };
+
+  void track(Topic*);
+
  protected:
   Connection(Conf*, Conf*);
   ~Connection();
@@ -82,6 +123,7 @@ class Connection : public Nan::ObjectWrap {
 
   static NAN_METHOD(NodeOnEvent);
   static NAN_METHOD(NodeGetMetadata);
+  static NAN_METHOD(NodeCreateTopic);
 };
 
 }  // namespace NodeKafka

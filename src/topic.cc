@@ -29,25 +29,29 @@ namespace NodeKafka {
  * @sa NodeKafka::Connection
  */
 
-Topic::Topic(std::string topic_name, RdKafka::Conf* config, Connection * handle) {  // NOLINT
+Connection::Topic::Topic(std::string topic_name, RdKafka::Conf* config,
+    Connection * handle) :
+    m_topic(NULL),
+    m_handle(handle),
+    m_config(config) {
+
   Baton b = handle->CreateTopic(topic_name, config);
 
-  if (b.err() != RdKafka::ERR_NO_ERROR) {
-    m_topic = NULL;
-  } else {
+  if (b.err() == RdKafka::ERR_NO_ERROR) {
     m_topic = b.data<RdKafka::Topic*>();
   }
+
 }
 
-Topic::~Topic() {
+Connection::Topic::~Topic() {
   if (m_topic) {
     delete m_topic;
   }
 }
 
-Nan::Persistent<v8::Function> Topic::constructor;
+Nan::Persistent<v8::Function> Connection::Topic::constructor;
 
-void Topic::Init(v8::Local<v8::Object> exports) {
+void Connection::Topic::Init(v8::Local<v8::Object> exports) {
   Nan::HandleScope scope;
 
   v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
@@ -55,20 +59,19 @@ void Topic::Init(v8::Local<v8::Object> exports) {
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   Nan::SetPrototypeMethod(tpl, "name", NodeGetName);
+  Nan::SetPrototypeMethod(tpl, "get", NodeGet);
 
   // connect. disconnect. resume. pause. get meta data
-  constructor.Reset(tpl->GetFunction());
-
-  exports->Set(Nan::New("Topic").ToLocalChecked(), tpl->GetFunction());
+  constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
 }
 
-void Topic::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+void Connection::Topic::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   if (!info.IsConstructCall()) {
     return Nan::ThrowError("non-constructor invocation not supported");
   }
 
   if (info.Length() < 3) {
-    return Nan::ThrowError("Handle, topic name, configuration required");
+    return Nan::ThrowError("Handle, topic name and configuration required");
   }
 
   if (!info[0]->IsString()) {
@@ -91,15 +94,7 @@ void Topic::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     return Nan::ThrowError(errstr.c_str());
   }
 
-  if (!info[2]->IsObject()) {
-    return Nan::ThrowError("Client is not of valid type.");
-  }
-
   Connection* connection = ObjectWrap::Unwrap<Connection>(info[2]->ToObject());
-
-  if (!connection->IsConnected()) {
-    return Nan::ThrowError("Client is not connected");
-  }
 
   Topic* topic = new Topic(topic_name, config, connection);
 
@@ -115,7 +110,7 @@ void Topic::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 
 // handle
 
-v8::Local<v8::Object> Topic::NewInstance(v8::Local<v8::Value> arg) {
+v8::Local<v8::Object> Connection::Topic::NewInstance(v8::Local<v8::Value> arg) {
   Nan::EscapableHandleScope scope;
 
   const unsigned argc = 1;
@@ -128,12 +123,12 @@ v8::Local<v8::Object> Topic::NewInstance(v8::Local<v8::Value> arg) {
   return scope.Escape(instance);
 }
 
-std::string Topic::name() {
-  return m_topic->name();
-}
+Baton Connection::Topic::toRdKafkaTopic() {
+  if (!m_handle || !m_handle->IsConnected()) {
+    return Baton(RdKafka::ERR__STATE);
+  }
 
-RdKafka::Topic * Topic::toRDKafkaTopic() {
-  return m_topic;
+  return Baton(m_topic);
 }
 
 /*
@@ -157,19 +152,54 @@ Baton offset_store (int32_t partition, int64_t offset) {
 
 */
 
-NAN_METHOD(Topic::NodeGetName) {
-  Nan::HandleScope scope;
-
+NAN_METHOD(Connection::Topic::NodeGet) {
   Topic* topic = ObjectWrap::Unwrap<Topic>(info.This());
 
-  info.GetReturnValue().Set(Nan::New(topic->name()).ToLocalChecked());
+  if (info.Length() < 1) {
+    return Nan::ThrowError("Must provide a config key to lookup.");
+  }
+
+  Nan::Utf8String parameterValue(info[0]->ToString());
+  std::string config_key(*parameterValue);
+
+  RdKafka::Conf * topic_conf = topic->m_config;
+
+  std::string value;
+
+  RdKafka::Conf::ConfResult res = topic_conf->get(config_key, value);
+
+  switch (res) {
+    case RdKafka::Conf::CONF_UNKNOWN:
+      return info.GetReturnValue().Set(Nan::Undefined());
+    case RdKafka::Conf::CONF_INVALID:
+      return Nan::ThrowError("Topic configuration retroactively invalid...");
+    case RdKafka::Conf::CONF_OK:
+      return info.GetReturnValue().Set(Nan::New(value).ToLocalChecked());
+  }
+
 }
 
-NAN_METHOD(Topic::NodePartitionAvailable) {
+NAN_METHOD(Connection::Topic::NodeGetName) {
+  Topic* topic = ObjectWrap::Unwrap<Topic>(info.This());
+  Baton b = topic->toRdKafkaTopic();
+
+  // Let the JS library throw if we need to so the error can be more rich
+  int error_code = static_cast<int>(b.err());
+
+  if (b.err() != RdKafka::ERR_NO_ERROR) {
+    return info.GetReturnValue().Set(Nan::New<v8::Number>(error_code));
+  }
+
+  RdKafka::Topic * t = b.data<RdKafka::Topic*>();
+
+  info.GetReturnValue().Set(Nan::New(t->name()).ToLocalChecked());
+}
+
+NAN_METHOD(Connection::Topic::NodePartitionAvailable) {
   // @TODO(sparente)
 }
 
-NAN_METHOD(Topic::NodeOffsetStore) {
+NAN_METHOD(Connection::Topic::NodeOffsetStore) {
   // @TODO(sparente)
 }
 

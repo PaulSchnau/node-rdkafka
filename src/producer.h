@@ -26,7 +26,7 @@ namespace NodeKafka {
 
 class ProducerMessage {
  public:
-  explicit ProducerMessage(v8::Local<v8::Object>, NodeKafka::Topic*);
+  explicit ProducerMessage(v8::Local<v8::Object>, NodeKafka::Connection::Topic*);
   ~ProducerMessage();
 
   void* Payload();
@@ -36,7 +36,7 @@ class ProducerMessage {
 
   std::string m_errstr;
 
-  Topic * m_topic;
+  Connection::Topic * m_topic;
   int32_t m_partition;
   std::string m_key;
 

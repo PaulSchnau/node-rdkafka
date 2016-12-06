@@ -106,8 +106,13 @@ Baton Connection::CreateTopic(std::string topic_name, RdKafka::Conf* conf) {
     return Baton(RdKafka::ErrorCode::ERR_TOPIC_EXCEPTION, errstr);
   }
 
-  // Maybe do it this way later? Then we don't need to do static_cast
-  // <RdKafka::Topic*>
+  // If we return an okay topic, cool. But the problem is, we aren't
+  // keeping track of these.
+  //
+  // The responsibility is on the person who creates this object to dispose
+  // of it, and to not reuse it if we disconnect from this client.
+
+  //
   return Baton(topic);
 }
 
@@ -151,6 +156,45 @@ Baton Connection::GetMetadata(std::string topic_name, int timeout_ms) {
 }
 
 // NAN METHODS
+NAN_METHOD(Connection::NodeCreateTopic) {
+  if (info.Length() < 2) {
+    return Nan::ThrowError("Topic name and configuration are required");
+  }
+
+  if (!info[0]->IsString()) {
+    return Nan::ThrowError("Topic name must be a string");
+  }
+
+  if (!info[1]->IsObject()) {
+    return Nan::ThrowError("Configuration data must be specified");
+  }
+
+  // Connection* connection = ObjectWrap::Unwrap<Connection>();
+
+  const int argc = 3;
+  v8::Local<v8::Value> argv[argc] = { info[0], info[1], info.This() };
+  v8::Local<v8::Function> cons = Nan::New(Topic::constructor);
+
+  Nan::TryCatch tc;
+
+  Nan::MaybeLocal<v8::Object> jsTopicMaybe = Nan::NewInstance(cons, argc, argv);
+
+  if (tc.HasCaught()) {
+    tc.ReThrow();
+    return;
+  }
+
+  if (jsTopicMaybe.IsEmpty()) {
+    return Nan::ThrowError("Unknownw error creating topic");
+  }
+
+  v8::Local<v8::Object> jsTopic = jsTopicMaybe.ToLocalChecked();
+
+  // Track it for reference counting
+  Connection* topic = ObjectWrap::Unwrap<Connection>(jsTopic);
+
+  info.GetReturnValue().Set(jsTopic);
+}
 
 NAN_METHOD(Connection::NodeGetMetadata) {
   Nan::HandleScope scope;

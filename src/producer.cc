@@ -35,7 +35,11 @@ Producer::Producer(Conf* gconfig, Conf* tconfig):
     std::string errstr;
 
     m_gconfig->set("default_topic_conf", m_tconfig, errstr);
+
+    m_tconfig->get("request.required.acks", errstr);
     m_gconfig->set("dr_cb", &m_dr_cb, errstr);
+
+    Log(errstr);
   }
 
 Producer::~Producer() {
@@ -50,6 +54,8 @@ void Producer::Init(v8::Local<v8::Object> exports) {
   v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
   tpl->SetClassName(Nan::New("Producer").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
+  Nan::SetPrototypeMethod(tpl, "Topic", NodeCreateTopic);
 
   /*
    * Lifecycle events inherited from NodeKafka::Connection
@@ -325,10 +331,21 @@ NAN_METHOD(Producer::NodeProduce) {
     key = new std::string(*keyUTF8);
   }
 
+  Baton topicBaton = topic->toRdKafkaTopic();
+
+  if (topicBaton.err() != RdKafka::ERR_NO_ERROR) {
+    // Let the JS library throw if we need to so the error can be more rich
+    int error_code = static_cast<int>(topicBaton.err());
+
+    return info.GetReturnValue().Set(Nan::New<v8::Number>(error_code));
+  }
+
+  RdKafka::Topic * rdTopic = topicBaton.data<RdKafka::Topic*>();
+
   Producer* producer = ObjectWrap::Unwrap<Producer>(info.This());
 
   Baton b = producer->Produce(message_buffer_data, message_buffer_length,
-    topic->toRDKafkaTopic(), partition, key);
+    rdTopic, partition, key);
 
   // we can delete the key as librdkafka will take a copy of the message
   if (key) {

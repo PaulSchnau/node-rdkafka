@@ -32,8 +32,9 @@ namespace NodeKafka {
 Connection::Topic::Topic(std::string topic_name, RdKafka::Conf* config,
     Connection * handle) :
     m_topic(NULL),
-    m_handle(handle),
-    m_config(config) {
+    m_topic_name(topic_name),
+    m_config(config),
+    m_handle(handle) {
 
   Baton b = handle->CreateTopic(topic_name, config);
 
@@ -131,23 +132,14 @@ Baton Connection::Topic::toRdKafkaTopic() {
   return Baton(m_topic);
 }
 
+std::string Connection::Topic::Name() {
+  return m_topic_name;
+}
+
 /*
 
 bool partition_available(int32_t partition) {
   return topic_->partition_available(partition);
-}
-
-Baton offset_store (int32_t partition, int64_t offset) {
-  RdKafka::ErrorCode err = topic_->offset_store(partition, offset);
-
-  switch (err) {
-    case RdKafka::ERR_NO_ERROR:
-
-      break;
-    default:
-
-      break;
-  }
 }
 
 */
@@ -181,25 +173,11 @@ NAN_METHOD(Connection::Topic::NodeGet) {
 
 NAN_METHOD(Connection::Topic::NodeGetName) {
   Topic* topic = ObjectWrap::Unwrap<Topic>(info.This());
-  Baton b = topic->toRdKafkaTopic();
 
-  // Let the JS library throw if we need to so the error can be more rich
-  int error_code = static_cast<int>(b.err());
-
-  if (b.err() != RdKafka::ERR_NO_ERROR) {
-    return info.GetReturnValue().Set(Nan::New<v8::Number>(error_code));
-  }
-
-  RdKafka::Topic * t = b.data<RdKafka::Topic*>();
-
-  info.GetReturnValue().Set(Nan::New(t->name()).ToLocalChecked());
+  info.GetReturnValue().Set(Nan::New(topic->Name()).ToLocalChecked());
 }
 
 NAN_METHOD(Connection::Topic::NodePartitionAvailable) {
-  // @TODO(sparente)
-}
-
-NAN_METHOD(Connection::Topic::NodeOffsetStore) {
   // @TODO(sparente)
 }
 

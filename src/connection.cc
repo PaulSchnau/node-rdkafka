@@ -155,6 +155,15 @@ Baton Connection::GetMetadata(std::string topic_name, int timeout_ms) {
   }
 }
 
+// Very internal methods
+void Connection::_track_topic(Connection::Topic * topic) {
+  m_tracked_topics.push_back(topic);
+}
+
+void Connection::_dereference_topics() {
+
+}
+
 // NAN METHODS
 NAN_METHOD(Connection::NodeCreateTopic) {
   if (info.Length() < 2) {
@@ -188,12 +197,7 @@ NAN_METHOD(Connection::NodeCreateTopic) {
     return Nan::ThrowError("Unknownw error creating topic");
   }
 
-  v8::Local<v8::Object> jsTopic = jsTopicMaybe.ToLocalChecked();
-
-  // Track it for reference counting
-  Connection* topic = ObjectWrap::Unwrap<Connection>(jsTopic);
-
-  info.GetReturnValue().Set(jsTopic);
+  info.GetReturnValue().Set(jsTopicMaybe.ToLocalChecked());
 }
 
 NAN_METHOD(Connection::NodeGetMetadata) {

@@ -35,11 +35,7 @@ Producer::Producer(Conf* gconfig, Conf* tconfig):
     std::string errstr;
 
     m_gconfig->set("default_topic_conf", m_tconfig, errstr);
-
-    m_tconfig->get("request.required.acks", errstr);
     m_gconfig->set("dr_cb", &m_dr_cb, errstr);
-
-    Log(errstr);
   }
 
 Producer::~Producer() {
@@ -173,8 +169,7 @@ Baton Producer::Connect() {
   m_client = RdKafka::Producer::create(m_gconfig, errstr);
 
   if (!m_client) {
-    // @todo implement errstr into this somehow
-    return Baton(RdKafka::ERR__STATE);
+    return Baton(RdKafka::ERR__STATE, errstr);
   }
 
   return Baton(RdKafka::ERR_NO_ERROR);

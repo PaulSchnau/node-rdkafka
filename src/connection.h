@@ -71,9 +71,9 @@ class Connection : public Nan::ObjectWrap {
 
     Baton toRdKafkaTopic();
     bool HasHandle();
-    void deref();
 
     std::string Get(std::string, std::string &);
+    std::string Name();
 
     static Nan::Persistent<v8::Function> constructor;
 
@@ -83,14 +83,12 @@ class Connection : public Nan::ObjectWrap {
 
     static NAN_METHOD(NodeGetMetadata);
 
+    // Created topic, maybe.
     RdKafka::Topic * m_topic;
-    // TopicConfig * config_;
 
-    std::string errstr;
-    Baton Name();
-
-    Connection * m_handle;
+    std::string m_topic_name;
     RdKafka::Conf * m_config;
+    Connection * m_handle;
 
    private:
     ~Topic();
@@ -98,7 +96,6 @@ class Connection : public Nan::ObjectWrap {
     static NAN_METHOD(NodeGet);
     static NAN_METHOD(NodeGetName);
     static NAN_METHOD(NodePartitionAvailable);
-    static NAN_METHOD(NodeOffsetStore);
   };
 
   void track(Topic*);
@@ -124,6 +121,12 @@ class Connection : public Nan::ObjectWrap {
   static NAN_METHOD(NodeOnEvent);
   static NAN_METHOD(NodeGetMetadata);
   static NAN_METHOD(NodeCreateTopic);
+
+ private:
+  std::vector<Topic*> m_tracked_topics;
+
+  void _track_topic(Topic* topic);
+  void _dereference_topics();
 };
 
 }  // namespace NodeKafka
